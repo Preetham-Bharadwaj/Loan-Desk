@@ -118,6 +118,17 @@ export const loanService = {
     const response = await api.delete(`/notifications/${id}`);
     return response.data;
   },
+
+  uploadAdditionalDocument: async (applicationId, documentType, file, customerId) => {
+    const formData = new FormData();
+    formData.append('document', file);
+    formData.append('documentType', documentType);
+    if (customerId) formData.append('customerId', customerId);
+    const response = await api.post(`/upload-document/${applicationId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
 };
 
 export default api;

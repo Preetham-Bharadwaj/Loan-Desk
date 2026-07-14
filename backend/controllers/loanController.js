@@ -245,3 +245,20 @@ exports.escalateApplication = async (req, res) => {
     return handleServiceError(res, error);
   }
 };
+
+exports.uploadAdditionalDocument = async (req, res) => {
+  try {
+    const file = req.files?.document?.[0] || req.files?.file?.[0] || null;
+    const application = await loanService.uploadAdditionalDocument(req.params.id, {
+      documentType: req.body.documentType || req.body.document_type,
+      customerId: req.body.customerId || req.body.customer_id,
+      file,
+    });
+    return res.status(200).json({
+      message: 'Document uploaded successfully.',
+      application,
+    });
+  } catch (error) {
+    return handleServiceError(res, error);
+  }
+};

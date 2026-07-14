@@ -11,11 +11,32 @@ const loanStatusMap = {
   manager_review: 'In Review',
   approvals_queue: 'In Review',
   additional_documents_required: 'Document Requested',
+  on_hold: 'On Hold',
+  hold: 'On Hold',
   approved: 'Approved',
   rejected: 'Rejected',
   disbursed: 'Approved',
   closed: 'Rejected',
 };
+
+// Valid application_status enum values in the database
+const validApplicationStatuses = new Set([
+  'draft',
+  'submitted',
+  'verification_queue',
+  'verification_in_progress',
+  'verification_completed',
+  'credit_queue',
+  'credit_in_progress',
+  'credit_completed',
+  'manager_review',
+  'approved',
+  'rejected',
+  'additional_documents_required',
+  'disbursed',
+  'closed',
+  'on_hold', // added via migration
+]);
 
 const reverseLoanStatusMap = Object.fromEntries(
   Object.entries(loanStatusMap).map(([key, value]) => [value.toLowerCase(), key])
@@ -34,7 +55,10 @@ const decisionStatusMap = {
   approved: 'Approved',
   rejected: 'Rejected',
   needs_documents: 'Needs Documents',
+  request_documents: 'Needs Documents',
   escalated: 'Escalated',
+  hold: 'On Hold',
+  on_hold: 'On Hold',
 };
 
 const assessmentStatusMap = {
@@ -83,7 +107,10 @@ function displayLoanStatus(value) {
 function dbLoanStatus(value) {
   const normalized = normalizeKey(value);
   if (normalized === 'in_review') return 'verification_queue';
-  if (normalized === 'document_requested') return 'additional_documents_required';
+  if (normalized === 'document_requested' || normalized === 'additional_documents_required') return 'additional_documents_required';
+  if (normalized === 'on_hold' || normalized === 'hold') return 'on_hold';
+  if (normalized === 'credit_review') return 'credit_queue';
+  if (normalized === 'escalated') return 'manager_review';
   return reverseLoanStatusMap[normalized] || normalized || value;
 }
 

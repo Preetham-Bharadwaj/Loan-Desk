@@ -1,11 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import useAuth from '../../hooks/useAuth';
-import { useApplications } from '../../hooks/useLoans';
+import { useApplications, useUploadAdditionalDocument } from '../../hooks/useLoans';
 import { loanService } from '../../services/api';
 import { Badge, LoadingPage } from '../../components/ui/Primitives';
 import {
-  FileText, ShieldCheck, Landmark, UserCheck, Download, Info, Activity, Eye, Printer
+  FileText, ShieldCheck, Landmark, UserCheck, Download, Info, Activity, Eye, Printer, Upload, CheckCircle
 } from 'lucide-react';
+
+/* ─── Document label → normalized key mapping ─────────────────────── */
+// Maps the display labels used in the Request Additional Documents modal
+// to the normalized keys used in app.documents and applicant_documents table
+const DOC_LABEL_TO_KEY = {
+  'bank statement':      'bankStatement',
+  'salary slip':         'salarySlip',
+  'pan card':            'pan',
+  'pan':                 'pan',
+  'aadhaar card':        'aadhaar',
+  'aadhaar':             'aadhaar',
+  'address proof':       'businessDocs',
+  'employment proof':    'businessDocs',
+  'other':               'businessDocs',
+  'photo':               'photo',
+  'photograph':          'photo',
+};
+
+const normalizeLabel = (label) => String(label || '').toLowerCase().trim();
+
+const docLabelToKey = (label) =>
+  DOC_LABEL_TO_KEY[normalizeLabel(label)] || normalizeLabel(label).replace(/\s+/g, '');
 
 /* ─── Constants ───────────────────────────────────────────────────── */
 const WORKFLOW_STAGES = [
@@ -221,29 +243,244 @@ const WorkflowStepper = ({ app }) => {
   );
 };
 
-const OverviewTab = ({ app }) => {
+const OverviewTab = ({ app, user }) => {
   const status = app.current_stage || app.status;
   const isRejected = app.status === 'Rejected';
   const isApproved = app.status === 'Approved';
+  const isDocRequested = ['Document Requested', 'Additional Documents Required'].includes(status);
+
+  const uploadMutation = useUploadAdditionalDocument();
+  // Track per-doc uploading state and feedback
+  const [uploadingDoc, setUploadingDoc] = useState(null);
+  const [uploadError, setUploadError]   = useState(null);
+  const fileInputRefs = useRef({});
+
+  // Parse requested doc labels and officer remarks from manager decision
+  const managerRemarks = app.reviews?.manager?.remarks || '';
+
+  const requestedDocLabels = React.useMemo(() => {
+    if (!isDocRequested) return [];
+    // New format: remarks is plain text, requestedDocuments stored in audit trail
+    // We reconstruct from audit logs action = 'Requested Additional Documents'
+    const auditEntry = (app.timeline || [])
+      .slice()
+      .reverse()
+      .find(e => e.action === 'Requested Additional Documents');
+
+    if (auditEntry?.remarks) {
+      // "Loan Officer requested additional documents: X, Y. Remarks: ..."
+      const match = auditEntry.remarks.match(/additional documents:\s*([^.]+)\./i);
+      if (match) {
+        return match[1].split(',').map(d => d.trim()).filter(Boolean);
+      }
+    }
+    // Fallback: try notification message bullet list
+    return [];
+  }, [isDocRequested, app.timeline]);
+
+  const officerRemarks = React.useMemo(() => {
+    if (!isDocRequested) return '';
+    // Extract from audit entry
+    const auditEntry = (app.timeline || [])
+      .slice()
+      .reverse()
+      .find(e => e.action === 'Requested Additional Documents');
+    if (auditEntry?.remarks) {
+      const match = auditEntry.remarks.match(/Remarks:\s*(.+)$/i);
+      return match ? match[1].trim() : '';
+    }
+    return managerRemarks;
+  }, [isDocRequested, app.timeline, managerRemarks]);
+
+  // Build per-doc status from app.documents
+  const docRows = React.useMemo(() => {
+    if (!isDocRequested || requestedDocLabels.length === 0) return [];
+    return requestedDocLabels.map(label => {
+      const docKey  = docLabelToKey(label);
+      const docData = app.documents?.[docKey] || null;
+      const rawStatus = docData?.status || '';
+      const verStatus = rawStatus.toLowerCase();
+      let displayStatus, statusColor, statusBg;
+
+      if (verStatus.includes('verif')) {
+        displayStatus = 'Verified';   statusColor = '#166534'; statusBg = '#f0fdf4';
+      } else if (verStatus.includes('upload') || verStatus.includes('pending') && docData?.fileUrl) {
+        displayStatus = 'Uploaded';   statusColor = '#1e40af'; statusBg = '#eff6ff';
+      } else if (verStatus.includes('reject') || verStatus.includes('mismatch')) {
+        displayStatus = 'Rejected';   statusColor = '#991b1b'; statusBg = '#fef2f2';
+      } else {
+        displayStatus = 'Pending';    statusColor = '#92400e'; statusBg = '#fffbeb';
+      }
+
+      return { label, docKey, docData, displayStatus, statusColor, statusBg };
+    });
+  }, [isDocRequested, requestedDocLabels, app.documents]);
+
+  const allUploaded = docRows.length > 0 && docRows.every(
+    r => r.displayStatus === 'Uploaded' || r.displayStatus === 'Verified'
+  );
+
+  const handleFileChange = async (e, label) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingDoc(label);
+    setUploadError(null);
+    try {
+      await uploadMutation.mutateAsync({
+        applicationId: app.id,
+        documentType: label,
+        file,
+        customerId: user?.id,
+      });
+    } catch (err) {
+      setUploadError(err?.response?.data?.message || err?.message || 'Upload failed. Please try again.');
+    } finally {
+      setUploadingDoc(null);
+      // Reset file input
+      if (fileInputRefs.current[label]) {
+        fileInputRefs.current[label].value = '';
+      }
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Status banner */}
       <div style={{
         display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '14px 16px', borderRadius: '10px',
-        background: isApproved ? '#f0fdf4' : isRejected ? '#fef2f2' : '#eff6ff',
-        border: `1px solid ${isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : '#dbeafe'}`,
+        background: isApproved ? '#f0fdf4' : isRejected ? '#fef2f2' : isDocRequested ? '#fffbeb' : '#eff6ff',
+        border: `1px solid ${isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : isDocRequested ? '#fde68a' : '#dbeafe'}`,
       }}>
-        <Info style={{ width: '15px', height: '15px', color: isApproved ? '#059669' : isRejected ? '#dc2626' : '#2563eb', flexShrink: 0, marginTop: '1px' }} />
+        <Info style={{ width: '15px', height: '15px', color: isApproved ? '#059669' : isRejected ? '#dc2626' : isDocRequested ? '#b45309' : '#2563eb', flexShrink: 0, marginTop: '1px' }} />
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: isApproved ? '#166534' : isRejected ? '#991b1b' : '#1e40af', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            Active Stage Info
+          <div style={{ fontSize: '11px', fontWeight: 700, color: isApproved ? '#166534' : isRejected ? '#991b1b' : isDocRequested ? '#92400e' : '#1e40af', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+            {isDocRequested ? '🟠 ADDITIONAL DOCUMENTS REQUIRED' : 'Active Stage Info'}
           </div>
-          <div style={{ fontSize: '13px', color: isApproved ? '#166534' : isRejected ? '#991b1b' : '#1e3a8a', lineHeight: 1.6 }}>
+          <div style={{ fontSize: '13px', color: isApproved ? '#166534' : isRejected ? '#991b1b' : isDocRequested ? '#92400e' : '#1e3a8a', lineHeight: 1.6 }}>
             {STATUS_DESCRIPTION[status] || STATUS_DESCRIPTION['Submitted']}
           </div>
         </div>
       </div>
+
+      {/* ── Requested Documents section ─────────────────────────────── */}
+      {isDocRequested && (
+        <div style={{ background: 'white', border: '1px solid #fde68a', borderRadius: '12px', overflow: 'hidden' }}>
+          {/* Header */}
+          <div style={{ padding: '14px 16px', background: '#fffbeb', borderBottom: '1px solid #fde68a', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileText style={{ width: '14px', height: '14px', color: '#b45309' }} />
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Additional Documents Required
+              </span>
+            </div>
+            <span style={{ fontSize: '11px', color: '#92400e', fontWeight: 600 }}>
+              Please upload the following requested documents
+            </span>
+          </div>
+
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+            {/* All uploaded success banner */}
+            {allUploaded && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
+                <CheckCircle style={{ width: '16px', height: '16px', color: '#16a34a', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#166534' }}>All requested documents uploaded.</div>
+                  <div style={{ fontSize: '12px', color: '#166534', marginTop: '2px' }}>Waiting for Loan Officer verification.</div>
+                </div>
+              </div>
+            )}
+
+            {/* Upload error */}
+            {uploadError && (
+              <div style={{ padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '12px', color: '#991b1b', fontWeight: 600 }}>
+                {uploadError}
+              </div>
+            )}
+
+            {/* Per-document rows */}
+            {docRows.length > 0 ? docRows.map(({ label, docData, displayStatus, statusColor, statusBg }) => {
+              const isUploading = uploadingDoc === label;
+              const isDone = displayStatus === 'Verified' || displayStatus === 'Uploaded';
+
+              return (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 14px', border: `1px solid ${isDone ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: '8px', background: isDone ? '#f0fdf4' : 'white', flexWrap: 'wrap' }}>
+                  {/* Doc name + status */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '7px', background: statusBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <FileText style={{ width: '14px', height: '14px', color: statusColor }} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{label}</div>
+                      {docData?.fileName && (
+                        <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>{docData.fileName}</div>
+                      )}
+                      {docData?.uploadTime && (
+                        <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '1px' }}>
+                          Uploaded {formatTs(docData.uploadTime)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status badge + upload button */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '999px', background: statusBg, color: statusColor, border: `1px solid ${statusColor}22` }}>
+                      {displayStatus}
+                    </span>
+
+                    {/* Hide upload button for verified docs */}
+                    {displayStatus !== 'Verified' && (
+                      <>
+                        <input
+                          ref={el => { fileInputRefs.current[label] = el; }}
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.webp"
+                          style={{ display: 'none' }}
+                          onChange={(e) => handleFileChange(e, label)}
+                        />
+                        <button
+                          type="button"
+                          disabled={isUploading}
+                          onClick={() => fileInputRefs.current[label]?.click()}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '5px',
+                            padding: '6px 12px', borderRadius: '6px', border: 'none',
+                            background: isUploading ? '#94a3b8' : isDone ? '#2563eb' : '#b45309',
+                            color: 'white', fontSize: '12px', fontWeight: 700,
+                            cursor: isUploading ? 'not-allowed' : 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <Upload style={{ width: '12px', height: '12px' }} />
+                          {isUploading ? 'Uploading…' : isDone ? 'Re-upload' : 'Upload'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            }) : (
+              /* Fallback if we couldn't parse the doc list */
+              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                The loan officer has requested additional documents. Please check your notifications for the full list.
+              </p>
+            )}
+
+            {/* Officer Remarks */}
+            {officerRemarks && (
+              <div style={{ padding: '10px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', borderLeft: '3px solid #b45309', marginTop: '2px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                  Officer Remarks
+                </div>
+                <p style={{ margin: 0, fontSize: '13px', color: '#334155', fontStyle: 'italic', lineHeight: 1.5 }}>
+                  "{officerRemarks}"
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Details grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
@@ -639,7 +876,7 @@ const MyApplications = () => {
 
                 {/* Tab content */}
                 <div style={{ padding: '24px' }}>
-                  {activeTab === 'overview'     && <OverviewTab      app={selected} />}
+                  {activeTab === 'overview'     && <OverviewTab      app={selected} user={user} />}
                   {activeTab === 'documents'    && <DocumentsTab     app={selected} />}
                   {activeTab === 'verification' && <VerificationTab  app={selected} />}
                   {activeTab === 'timeline'     && <TimelineTab      app={selected} />}

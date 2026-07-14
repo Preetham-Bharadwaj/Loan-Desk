@@ -43,6 +43,8 @@ router.put('/escalate', (req, res, next) => {
   next();
 }, loanController.escalateApplication);
 
+router.post('/upload-document/:id', upload.fields([{ name: 'document', maxCount: 1 }, { name: 'file', maxCount: 1 }]), loanController.uploadAdditionalDocument);
+
 router.put('/credit-review/:id', loanController.creditReview);
 router.put('/credit-review', (req, res, next) => {
   req.params.id = req.body.id || req.body.applicationId;

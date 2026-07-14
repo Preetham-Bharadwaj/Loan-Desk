@@ -73,3 +73,15 @@ export const useDeleteNotification = () => {
     },
   });
 };
+
+export const useUploadAdditionalDocument = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, documentType, file, customerId }) =>
+      loanService.uploadAdditionalDocument(applicationId, documentType, file, customerId),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['application', variables.applicationId] });
+    },
+  });
+};

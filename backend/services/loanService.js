@@ -968,7 +968,7 @@ const notificationSchemas = [
   },
 ];
 
-function buildNotificationPayload(schema, { userId, title, message, applicationId }) {
+function buildNotificationPayload(schema, { userId, title, message, applicationId, priority = 'medium' }) {
   const payload = {
     [schema.id]: randomUUID(),
     [schema.recipient]: userId,
@@ -983,12 +983,12 @@ function buildNotificationPayload(schema, { userId, title, message, applicationI
   }
   if (schema.updatedAt) payload[schema.updatedAt] = payload[schema.createdAt];
   if (schema.type) payload[schema.type] = 'loan_update';
-  if (schema.priority) payload[schema.priority] = 'medium';
+  if (schema.priority) payload[schema.priority] = priority || 'medium';
 
   return payload;
 }
 
-async function insertNotification(userId, title, message, applicationId = null) {
+async function insertNotification(userId, title, message, applicationId = null, priority = 'medium') {
   let lastError = null;
 
   for (const schema of notificationSchemas) {
@@ -998,6 +998,7 @@ async function insertNotification(userId, title, message, applicationId = null) 
         title,
         message,
         applicationId: includeApplicationId ? applicationId : null,
+        priority,
       });
       const { error } = await supabase.from('notifications').insert(payload);
       if (!error) return;
@@ -1111,9 +1112,9 @@ async function createInitialWorkflowRecords(applicationId, payload, customerId) 
   await insertAuditLog(applicationId, customerId, 'Application Submitted', 'Application submitted successfully.');
 }
 
-async function safeInsertNotification(userId, title, message, applicationId = null) {
+async function safeInsertNotification(userId, title, message, applicationId = null, priority = 'medium') {
   try {
-    await insertNotification(userId, title, message, applicationId);
+    await insertNotification(userId, title, message, applicationId, priority);
   } catch (error) {
     if (!isMissingNotificationColumnError(error)) {
       throw error;
@@ -1550,8 +1551,10 @@ async function updateManagerDecision(applicationId, payload = {}) {
     : ['reject', 'rejected'].includes(normalizedDecision)
       ? 'rejected'
       : ['need_documents', 'needs_documents', 'documents', 'additional_documents', 'request_additional_documents'].includes(normalizedDecision)
-        ? 'needs_documents'
-        : normalizedDecision || 'rejected';
+        ? 'request_documents'
+        : ['hold', 'on_hold'].includes(normalizedDecision)
+          ? 'on_hold'
+          : normalizedDecision || 'rejected';
   const approvedAmount = decisionOutcome === 'approved'
     ? toNumber(
         payload.approvedAmount || payload.approved_amount,
@@ -1577,9 +1580,11 @@ async function updateManagerDecision(applicationId, payload = {}) {
     ? dbLoanStatus('Approved')
     : decisionOutcome === 'rejected'
       ? dbLoanStatus('Rejected')
-      : decisionOutcome === 'needs_documents'
+      : decisionOutcome === 'request_documents'
         ? dbLoanStatus('Document Requested')
-        : dbLoanStatus('In Review');
+        : decisionOutcome === 'on_hold'
+          ? dbLoanStatus('On Hold')
+          : dbLoanStatus('In Review');
 
   const decisionPayloads = [
     {
@@ -1608,34 +1613,6 @@ async function updateManagerDecision(applicationId, payload = {}) {
       manager_remarks: payload.remarks || '',
       rejection_reason: rejectionReason,
       decision_date: updatedAt,
-      updated_at: updatedAt,
-    },
-    {
-      application_id: applicationId,
-      manager_id: managerId,
-      approved_amount: approvedAmount,
-      approved_interest_rate: decisionOutcome === 'approved' ? interestRate : null,
-      processing_fee: processingFee,
-      loan_tenure_months: loanTenureMonths,
-      monthly_emi: monthlyEmi,
-      decision: decisionOutcome,
-      manager_remarks: payload.remarks || '',
-      rejection_reason: rejectionReason,
-      decided_at: updatedAt,
-      updated_at: updatedAt,
-    },
-    {
-      application_id: applicationId,
-      decided_by: managerId,
-      approved_amount: approvedAmount,
-      approved_interest_rate: decisionOutcome === 'approved' ? interestRate : null,
-      processing_fee: processingFee,
-      loan_tenure_months: loanTenureMonths,
-      monthly_emi: monthlyEmi,
-      decision: decisionOutcome,
-      manager_remarks: payload.remarks || '',
-      rejection_reason: rejectionReason,
-      decided_at: updatedAt,
       updated_at: updatedAt,
     },
   ];
@@ -1808,7 +1785,58 @@ async function updateManagerDecision(applicationId, payload = {}) {
     }
   }
 
+  // ── Step: Upsert applicant_documents for each requested document ────────────
+  if (decisionOutcome === 'request_documents') {
+    const requestedDocuments = asArray(payload.requestedDocuments || payload.requested_documents);
+    if (requestedDocuments.length > 0) {
+      const docUpsertResults = await Promise.allSettled(
+        requestedDocuments.map(async (docLabel) => {
+          const documentType = normalizeDocumentTypeForDb(docLabel, application.loan_type);
+          const existingDocQuery = await supabase
+            .from('applicant_documents')
+            .select('document_id')
+            .eq('application_id', applicationId)
+            .eq('document_type', documentType)
+            .maybeSingle();
+
+          const docPayload = {
+            application_id: applicationId,
+            document_type: documentType,
+            verification_status: 'pending',
+            is_latest: true,
+            uploaded_by: application.customer_id,
+            updated_at: updatedAt,
+          };
+
+          if (existingDocQuery.data?.document_id) {
+            return supabase
+              .from('applicant_documents')
+              .update(docPayload)
+              .eq('document_id', existingDocQuery.data.document_id);
+          } else {
+            return supabase
+              .from('applicant_documents')
+              .insert({ ...docPayload, document_id: randomUUID(), created_at: updatedAt });
+          }
+        })
+      );
+
+      const failedDocs = docUpsertResults.filter(r => r.status === 'rejected' || r.value?.error);
+      if (failedDocs.length > 0) {
+        console.warn('[updateManagerDecision] Some document upserts failed:', failedDocs);
+      }
+    }
+  }
+
+  // ── Audit log ────────────────────────────────────────────────────────────────
   try {
+    const requestedDocuments = asArray(payload.requestedDocuments || payload.requested_documents);
+    const auditDescription = decisionOutcome === 'request_documents'
+      ? `Loan Officer requested additional documents: ${requestedDocuments.join(', ') || 'see remarks'}. Remarks: ${payload.remarks || ''}`
+      : decisionOutcome === 'on_hold'
+        ? 'Loan application placed on hold by Loan Officer.'
+        : payload.remarks || 'Manager decision recorded.';
+
     await insertAuditLog(
       applicationId,
       managerId || application.customer_id,
@@ -1816,28 +1844,53 @@ async function updateManagerDecision(applicationId, payload = {}) {
         ? 'Loan Approved'
         : decisionOutcome === 'rejected'
           ? 'Loan Rejected'
-          : 'Manager Decision Recorded',
-      payload.remarks || 'Manager decision recorded.'
+          : decisionOutcome === 'request_documents'
+            ? 'Requested Additional Documents'
+            : decisionOutcome === 'on_hold'
+              ? 'Application Held'
+              : 'Manager Decision Recorded',
+      auditDescription,
+      'Decision'
     );
   } catch (auditError) {
     console.warn('[updateManagerDecision] Audit log insertion failed:', auditError);
   }
 
+  // ── Customer notification ────────────────────────────────────────────────────
   try {
+    const requestedDocuments = asArray(payload.requestedDocuments || payload.requested_documents);
+    const docListText = requestedDocuments.length > 0
+      ? requestedDocuments.map(d => `• ${d}`).join('\n')
+      : '';
+    const remarksText = payload.remarks ? `\nRemarks: ${payload.remarks}` : '';
+
+    const notifTitle = decisionOutcome === 'approved'
+      ? 'Loan Approved'
+      : decisionOutcome === 'rejected'
+        ? 'Loan Rejected'
+        : decisionOutcome === 'request_documents'
+          ? 'Additional Documents Required'
+          : decisionOutcome === 'on_hold'
+            ? 'Application On Hold'
+            : 'Application Update';
+
+    const notifMessage = decisionOutcome === 'approved'
+      ? `Your loan has been approved. Your Loan Sanction Letter is now available for download.`
+      : decisionOutcome === 'rejected'
+        ? `Your loan application has been rejected. Your Rejection Letter is available for download.`
+        : decisionOutcome === 'request_documents'
+          ? `Additional documents are required to continue processing your loan application.\n${docListText}${remarksText}`
+          : decisionOutcome === 'on_hold'
+            ? `Your loan application ${applicationId} has been placed on hold for manual review. You will be notified once a decision is made.`
+            : `Your application ${applicationId} has been updated.`;
+
     await safeInsertNotification(
       application.customer_id,
-      decisionOutcome === 'approved'
-        ? 'Loan Approved'
-        : decisionOutcome === 'rejected'
-          ? 'Loan Rejected'
-          : 'Application Update',
-      decisionOutcome === 'approved'
-        ? `Your loan has been approved. Your Loan Sanction Letter is now available for download.`
-        : decisionOutcome === 'rejected'
-        ? `Your loan application has been rejected. Your Rejection Letter is available for download.`
-        : `Your application ${applicationId} has been updated.`,
-      applicationId
-      );
+      notifTitle,
+      notifMessage,
+      applicationId,
+      'high'
+    );
   } catch (notifError) {
     console.warn('[updateManagerDecision] Customer notification failed:', notifError);
   }
@@ -2536,6 +2589,174 @@ async function getDocumentUrl(storagePath, fileUrl) {
   return { url: null, type: 'unavailable' };
 }
 
+// ── Upload Additional Document ────────────────────────────────────────────────
+// Called when a customer uploads one of the requested documents.
+// 1. Uploads the file to storage
+// 2. Upserts applicant_documents row with file_url + verification_status = 'uploaded'
+// 3. Inserts audit log
+// 4. Checks if all pending requested documents are now uploaded
+//    → if yes: sets application_status back to verification_queue, notifies officer
+async function uploadAdditionalDocument(applicationId, payload = {}) {
+  const { documentType, file, customerId } = payload;
+
+  if (!documentType) {
+    const err = new Error('documentType is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!file) {
+    const err = new Error('No file provided');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const { data: application, error: appError } = await supabase
+    .from('loan_applications')
+    .select('*')
+    .eq('application_id', applicationId)
+    .maybeSingle();
+
+  if (appError) throw appError;
+  if (!application) {
+    const err = new Error('Application not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const now = nowIso();
+  const normalizedDocType = normalizeDocumentTypeForDb(documentType, application.loan_type);
+  const { fileName, fileSize, mimeType } = getFileMeta(file, normalizedDocType);
+
+  // Upload file to storage
+  const fileUrl = await uploadDocumentToStorage(applicationId, normalizedDocType, file);
+  if (!fileUrl) {
+    const err = new Error('File upload failed');
+    err.statusCode = 500;
+    throw err;
+  }
+
+  // Upsert the applicant_documents row
+  const { data: existing } = await supabase
+    .from('applicant_documents')
+    .select('document_id')
+    .eq('application_id', applicationId)
+    .eq('document_type', normalizedDocType)
+    .maybeSingle();
+
+  if (existing?.document_id) {
+    const { error: updateErr } = await supabase
+      .from('applicant_documents')
+      .update({
+        file_url: fileUrl,
+        file_name: fileName,
+        file_size: fileSize || null,
+        mime_type: mimeType,
+        verification_status: 'uploaded',
+        uploaded_at: now,
+        updated_at: now,
+        is_latest: true,
+      })
+      .eq('document_id', existing.document_id);
+    if (updateErr) throw updateErr;
+  } else {
+    const { error: insertErr } = await supabase
+      .from('applicant_documents')
+      .insert({
+        document_id: randomUUID(),
+        application_id: applicationId,
+        document_type: normalizedDocType,
+        file_url: fileUrl,
+        file_name: fileName,
+        file_size: fileSize || null,
+        mime_type: mimeType,
+        uploaded_by: customerId || application.customer_id,
+        verification_status: 'uploaded',
+        uploaded_at: now,
+        created_at: now,
+        updated_at: now,
+        is_latest: true,
+      });
+    if (insertErr) throw insertErr;
+  }
+
+  // Audit log for this upload
+  try {
+    await insertAuditLog(
+      applicationId,
+      customerId || application.customer_id,
+      'Document Uploaded',
+      `Customer uploaded ${documentType} as part of additional documents request.`,
+      'Document'
+    );
+  } catch (auditErr) {
+    console.warn('[uploadAdditionalDocument] Audit log failed:', auditErr);
+  }
+
+  // Check if all requested (pending/uploaded) documents now have a file
+  const { data: allDocs } = await supabase
+    .from('applicant_documents')
+    .select('document_type, verification_status, file_url')
+    .eq('application_id', applicationId);
+
+  const pendingDocs = (allDocs || []).filter(
+    (d) => d.verification_status === 'pending' && !d.file_url
+  );
+
+  if (pendingDocs.length === 0) {
+    // All requested docs uploaded — move back to review queue
+    await supabase
+      .from('loan_applications')
+      .update({
+        application_status: 'verification_queue',
+        updated_at: now,
+      })
+      .eq('application_id', applicationId);
+
+    // Notify the assigned loan officer
+    try {
+      const assignedOfficer = application.assigned_employee;
+      if (assignedOfficer) {
+        await safeInsertNotification(
+          assignedOfficer,
+          'Documents Submitted',
+          `Applicant has uploaded all requested documents for application ${applicationId}. Please review.`,
+          applicationId,
+          'high'
+        );
+      }
+    } catch (notifErr) {
+      console.warn('[uploadAdditionalDocument] Officer notification failed:', notifErr);
+    }
+
+    // Notify the customer too
+    try {
+      await safeInsertNotification(
+        application.customer_id,
+        'Documents Submitted',
+        `All requested documents for application ${applicationId} have been uploaded. Your application is back under review.`,
+        applicationId,
+        'medium'
+      );
+    } catch (notifErr) {
+      console.warn('[uploadAdditionalDocument] Customer notification failed:', notifErr);
+    }
+
+    try {
+      await insertAuditLog(
+        applicationId,
+        customerId || application.customer_id,
+        'All Documents Uploaded',
+        'Customer uploaded all requested documents. Application returned to verification queue.',
+        'Document'
+      );
+    } catch (auditErr) {
+      console.warn('[uploadAdditionalDocument] All-docs audit log failed:', auditErr);
+    }
+  }
+
+  return getApplicationById(applicationId);
+}
+
 module.exports = {
   getApplications,
   getApplicationById,
@@ -2545,6 +2766,7 @@ module.exports = {
   updateManagerDecision,
   rejectVerificationApplication,
   requestAdditionalDocumentsAtVerification,
+  uploadAdditionalDocument,
   forwardToLoanOfficer,
   escalateApplication,
   getDocumentUrl,

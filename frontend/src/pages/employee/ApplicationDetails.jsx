@@ -1016,6 +1016,144 @@ const ActionCard = ({ icon: Icon, title, subtitle, tone = 'blue', onClick, disab
   );
 };
 
+/* ─── Requested Documents helpers (employee side) ──────────────────
+ * Parses the audit timeline to extract which documents were requested
+ * by the loan officer, then maps them to the current applicant_documents
+ * data in app.documents to show live status + file info.
+ * ──────────────────────────────────────────────────────────────────── */
+const EMP_DOC_LABEL_TO_KEY = {
+  'bank statement':   'bankStatement',
+  'salary slip':      'salarySlip',
+  'pan card':         'pan',
+  'pan':              'pan',
+  'aadhaar card':     'aadhaar',
+  'aadhaar':          'aadhaar',
+  'address proof':    'businessDocs',
+  'employment proof': 'businessDocs',
+  'other':            'businessDocs',
+  'photo':            'photo',
+  'photograph':       'photo',
+};
+
+function parseRequestedDocLabels(timeline = []) {
+  // Find the most recent "Requested Additional Documents" audit entry
+  const entry = [...timeline]
+    .reverse()
+    .find(e => e.action === 'Requested Additional Documents');
+  if (!entry?.remarks) return { labels: [], remarks: '' };
+
+  // Format: "Loan Officer requested additional documents: X, Y. Remarks: ..."
+  const docsMatch = entry.remarks.match(/additional documents:\s*([^.]+)\./i);
+  const remarksMatch = entry.remarks.match(/Remarks:\s*(.+)$/i);
+  return {
+    labels: docsMatch ? docsMatch[1].split(',').map(d => d.trim()).filter(Boolean) : [],
+    remarks: remarksMatch ? remarksMatch[1].trim() : '',
+  };
+}
+
+function empDocLabelToKey(label) {
+  return EMP_DOC_LABEL_TO_KEY[String(label || '').toLowerCase().trim()]
+    || String(label || '').toLowerCase().replace(/\s+/g, '');
+}
+
+const RequestedDocumentsPanel = ({ app, onViewDocument }) => {
+  const isDocRequested = (app?.status || '').toLowerCase().includes('document');
+  const { labels, remarks } = React.useMemo(
+    () => parseRequestedDocLabels(app?.timeline || []),
+    [app?.timeline]
+  );
+
+  if (!isDocRequested || labels.length === 0) return null;
+
+  const rows = labels.map(label => {
+    const key = empDocLabelToKey(label);
+    const doc = app?.documents?.[key] || null;
+    const rawStatus = (doc?.status || '').toLowerCase();
+
+    let statusLabel, statusBg, statusColor, statusBorder;
+    if (rawStatus.includes('verif')) {
+      statusLabel = 'Verified';   statusBg = C.greenSoft;  statusColor = C.green;  statusBorder = C.greenLine;
+    } else if (rawStatus.includes('upload') || (rawStatus.includes('pending') && doc?.fileUrl)) {
+      statusLabel = 'Uploaded';   statusBg = C.blueSoft;   statusColor = C.blue;   statusBorder = C.blueLine;
+    } else if (rawStatus.includes('reject') || rawStatus.includes('mismatch')) {
+      statusLabel = 'Rejected';   statusBg = C.redSoft;    statusColor = C.red;    statusBorder = C.redLine;
+    } else {
+      statusLabel = 'Pending';    statusBg = C.amberSoft;  statusColor = C.amber;  statusBorder = C.amberLine;
+    }
+
+    return { label, doc, statusLabel, statusBg, statusColor, statusBorder };
+  });
+
+  return (
+    <ModuleCard title="Requested Documents" icon={FileText}>
+      <div style={{ display: 'grid', gap: '10px' }}>
+        {/* Officer remarks */}
+        {remarks && (
+          <div style={{ padding: '10px 12px', background: C.amberSoft, border: `1px solid ${C.amberLine}`, borderRadius: '6px', borderLeft: `3px solid ${C.amber}`, marginBottom: '4px' }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px' }}>
+              Officer Remarks
+            </div>
+            <p style={{ margin: 0, fontSize: '12px', color: C.sub, fontStyle: 'italic', lineHeight: 1.5 }}>
+              "{remarks}"
+            </p>
+          </div>
+        )}
+
+        {/* Document rows */}
+        {rows.map(({ label, doc, statusLabel, statusBg, statusColor, statusBorder }) => (
+          <div
+            key={label}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: '12px', padding: '10px 12px',
+              border: `1px solid ${statusBorder}`,
+              borderRadius: '8px', background: statusBg,
+              flexWrap: 'wrap',
+            }}
+          >
+            {/* Left: icon + name + meta */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+              <div style={{ width: '30px', height: '30px', borderRadius: '6px', background: C.white, border: `1px solid ${statusBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <FileText style={{ width: '13px', height: '13px', color: statusColor }} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: C.text }}>{label}</div>
+                {doc?.fileName && (
+                  <div style={{ fontSize: '11px', color: C.muted, fontFamily: 'monospace', marginTop: '1px' }}>
+                    {doc.fileName}
+                  </div>
+                )}
+                {doc?.uploadTime && (
+                  <div style={{ fontSize: '10px', color: C.faint, marginTop: '1px' }}>
+                    {shortDate(doc.uploadTime)}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: status badge + view button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '999px', background: C.white, color: statusColor, border: `1px solid ${statusBorder}` }}>
+                {statusLabel}
+              </span>
+              {doc?.fileUrl && (
+                <button
+                  type="button"
+                  onClick={() => onViewDocument(doc)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '6px', border: `1px solid ${C.border}`, background: C.white, color: C.sub, fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  <Eye style={{ width: '12px', height: '12px' }} />
+                  View
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </ModuleCard>
+  );
+};
+
 const ApplicationDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -1188,6 +1326,7 @@ const ApplicationDetails = () => {
     // Show modal for document request
     if (action === 'docs') {
       setDocRequestRemarks(decisionRemarks.trim());
+      setDecisionRemarks('');
       setShowDocRequestModal(true);
       return;
     }
@@ -1235,6 +1374,41 @@ const ApplicationDetails = () => {
     }
   };
 
+  const handleConfirmHold = () => {
+    if (!decisionRemarks.trim()) {
+      setFeedback('Officer Remarks are required before placing on hold.');
+      setShowHoldConfirm(false);
+      return;
+    }
+
+    managerMutation.mutate(
+      {
+        id,
+        decisionData: {
+          managerId: user?.id,
+          managerName: user?.fullName,
+          decision: 'hold',
+          remarks: decisionRemarks.trim(),
+          approvedAmount: 0,
+          interestRate: app?.interestRate || 0,
+          loanTenure: app?.tenureMonths || 0,
+        },
+      },
+      {
+        onSuccess: () => {
+          setFeedback('Application successfully placed on hold.');
+          setShowHoldConfirm(false);
+          setDecisionRemarks('');
+          setTimeout(() => window.location.reload(), 1000);
+        },
+        onError: (err) => {
+          setFeedback(err?.response?.data?.message || err?.message || 'Unable to place application on hold. Please try again.');
+          setShowHoldConfirm(false);
+        },
+      }
+    );
+  };
+
   const handleConfirmReject = () => {
     if (!rejectReason.trim()) {
       setFeedback('Reject reason is required.');
@@ -1276,11 +1450,9 @@ const ApplicationDetails = () => {
     }
 
     if (!docRequestRemarks.trim()) {
-      setFeedback('Please provide remarks for the document request.');
+      setFeedback('Officer remarks are required.');
       return;
     }
-
-    const docsMessage = `Documents requested: ${requestedDocs.join(', ')}. ${docRequestRemarks}`;
 
     managerMutation.mutate(
       {
@@ -1289,15 +1461,16 @@ const ApplicationDetails = () => {
           managerId: user?.id,
           managerName: user?.fullName,
           decision: 'need_documents',
-          remarks: docsMessage,
-          approvedAmount: app?.amount || 0,
+          remarks: docRequestRemarks.trim(),
+          requestedDocuments: requestedDocs,
+          approvedAmount: 0,
           interestRate: app?.interestRate || 0,
           loanTenure: app?.tenureMonths || 0,
         },
       },
       {
         onSuccess: () => {
-          setFeedback('Document request sent successfully. Customer has been notified.');
+          setFeedback('Additional document request sent successfully.');
           setShowDocRequestModal(false);
           setRequestedDocs([]);
           setDocRequestRemarks('');
@@ -1460,6 +1633,8 @@ const ApplicationDetails = () => {
           </div>
         </ModuleCard>
       )}
+
+      <RequestedDocumentsPanel app={app} onViewDocument={handleViewDocument} />
     </div>
   );
 
@@ -1757,9 +1932,9 @@ const ApplicationDetails = () => {
 
     const isApproved         = sl.includes('approv');
     const isRejected         = sl.includes('reject') || sl === 'closed';
+    const isOnHold           = sl.includes('hold');
     const isDocRequested     = sl.includes('document');
-    // All other states (in review, queued, hold-which-maps-back-to-in-review)
-    // fall through to the actionable controls block below.
+    // All other states (in review, queued) fall through to the actionable controls block below.
 
     // ── Terminal state: Approved ─────────────────────────────────────────────
     if (isApproved) {
@@ -1905,6 +2080,28 @@ const ApplicationDetails = () => {
 
             {/* Context banner when docs already requested */}
             {isDocRequested && (
+              <div style={{ display: 'grid', gap: '10px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  background: C.amberSoft,
+                  border: `1px solid ${C.amberLine}`,
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: C.amber,
+                  fontWeight: 600,
+                }}>
+                  <FileText style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+                  Additional documents have already been requested from the applicant.
+                </div>
+                <RequestedDocumentsPanel app={app} onViewDocument={handleViewDocument} />
+              </div>
+            )}
+
+            {/* Context banner when application is on hold */}
+            {isOnHold && (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -1917,8 +2114,8 @@ const ApplicationDetails = () => {
                 color: C.amber,
                 fontWeight: 600,
               }}>
-                <FileText style={{ width: '14px', height: '14px', flexShrink: 0 }} />
-                Additional documents have already been requested from the applicant.
+                <PauseCircle style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+                🟠 ON HOLD — Application placed on hold. Waiting for manual review.
               </div>
             )}
 
@@ -1968,15 +2165,17 @@ const ApplicationDetails = () => {
                 onClick={() => handleDecisionAction('approve')}
               />
 
-              {/* Hold Application — always visible when actionable */}
-              <ActionCard
-                icon={PauseCircle}
-                title="Hold Application"
-                subtitle="Waiting for clarification or manual review"
-                tone="amber"
-                disabled={managerMutation.isPending}
-                onClick={() => handleDecisionAction('hold')}
-              />
+              {/* Hold Application — hidden when already on hold */}
+              {!isOnHold && (
+                <ActionCard
+                  icon={PauseCircle}
+                  title="Hold Application"
+                  subtitle="Waiting for clarification or manual review"
+                  tone="amber"
+                  disabled={managerMutation.isPending}
+                  onClick={() => handleDecisionAction('hold')}
+                />
+              )}
 
               {/* Request Additional Documents — hidden when docs already requested */}
               {!isDocRequested && (
@@ -2172,7 +2371,8 @@ const ApplicationDetails = () => {
             ? feedback
             : sl.includes('approved')   ? `Loan approved by Loan Officer · ${dateLabel}`
             : sl.includes('rejected')   ? `Application rejected · ${dateLabel}`
-            : sl.includes('hold') || sl.includes('document') ? `Documents requested · ${dateLabel}`
+            : sl.includes('hold')       ? `Application placed on hold. Waiting for manual review · ${dateLabel}`
+            : sl.includes('document') || sl.includes('additional')  ? `Waiting for applicant documents · ${dateLabel}`
             : `Under review · ${dateLabel}`;
           return (
             <div style={{
@@ -2189,7 +2389,9 @@ const ApplicationDetails = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: dot, flexShrink: 0 }} />
                 <span style={{ fontSize: '15px', fontWeight: 800, color, letterSpacing: '0.3px' }}>
-                  {s.toUpperCase()}
+                  {sl.includes('document') || sl.includes('additional')
+                    ? '🟠 ADDITIONAL DOCUMENTS REQUIRED'
+                    : s.toUpperCase()}
                 </span>
               </div>
               <div style={{ fontSize: '11px', color, opacity: 0.8, lineHeight: 1.4 }}>
@@ -2411,6 +2613,7 @@ const ApplicationDetails = () => {
               <button
                 type="button"
                 onClick={() => {
+                  setDecisionRemarks(docRequestRemarks);
                   setShowDocRequestModal(false);
                   setRequestedDocs([]);
                   setDocRequestRemarks('');
@@ -2444,6 +2647,123 @@ const ApplicationDetails = () => {
                 }}
               >
                 {managerMutation.isPending ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Hold Confirmation Modal */}
+      {showHoldConfirm && (
+        <>
+          <div
+            onClick={() => setShowHoldConfirm(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.4)',
+              backdropFilter: 'blur(2px)',
+              zIndex: 50,
+            }}
+          />
+          <div style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 'min(90%, 450px)',
+            background: C.white,
+            borderRadius: '12px',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+            zIndex: 51,
+            fontFamily: 'Inter, sans-serif',
+          }}>
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: `1px solid ${C.border}`,
+              background: C.amberSoft,
+            }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: C.amber }}>
+                Hold Application
+              </h3>
+              <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#92400e' }}>
+                This application will be placed on hold for manual review.
+              </p>
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              <div style={{
+                padding: '12px',
+                borderRadius: '8px',
+                background: C.amberSoft,
+                border: `1px solid ${C.amberLine}`,
+                fontSize: '12px',
+                color: '#92400e',
+                lineHeight: 1.5,
+              }}>
+                The applicant will not receive a final decision until the hold is removed.
+                You can approve, reject, or request documents after placing on hold.
+              </div>
+
+              <div style={{ marginTop: '16px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px', display: 'block' }}>
+                  Officer Remarks <span style={{ color: C.red }}>*</span>
+                </label>
+                <div style={{
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  background: '#F8FAFC',
+                  border: `1px solid ${C.border}`,
+                  fontSize: '13px',
+                  color: C.text,
+                  lineHeight: 1.5,
+                  minHeight: '48px',
+                }}>
+                  {decisionRemarks || <span style={{ color: C.muted, fontStyle: 'italic' }}>No remarks entered.</span>}
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              padding: '16px 24px',
+              borderTop: `1px solid ${C.border}`,
+              background: '#FAFAFA',
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'flex-end',
+            }}>
+              <button
+                type="button"
+                onClick={() => setShowHoldConfirm(false)}
+                style={{
+                  padding: '9px 16px',
+                  borderRadius: '6px',
+                  border: `1px solid ${C.border}`,
+                  background: C.white,
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: C.sub,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmHold}
+                disabled={managerMutation.isPending}
+                style={{
+                  padding: '9px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: managerMutation.isPending ? C.muted : C.amber,
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: C.white,
+                  cursor: managerMutation.isPending ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {managerMutation.isPending ? 'Processing...' : 'Confirm Hold'}
               </button>
             </div>
           </div>
