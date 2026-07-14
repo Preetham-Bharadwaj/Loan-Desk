@@ -6,11 +6,20 @@ const loanRoutes = require('./routes/loanRoutes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Enable CORS for frontend development
+// CORS — allow requests from the frontend origin (set FRONTEND_URL in env)
+const allowedOrigins = process.env.FRONTEND_URL
+  ? [process.env.FRONTEND_URL]
+  : ['http://localhost:5173', 'http://localhost:3000'];
+
 app.use(cors({
-  origin: '*', // Allow all origins for the prototype
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. curl, Render health checks)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json());
