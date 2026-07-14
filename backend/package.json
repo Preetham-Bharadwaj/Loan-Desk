@@ -1,0 +1,23 @@
+{
+  "name": "loan-desk-backend",
+  "version": "1.0.0",
+  "description": "Supabase-backed backend for Loan Desk Workflow Prototype",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "seed:demo-accounts": "node scripts/seed-demo-accounts.js",
+    "sync:demo-auth": "node scripts/sync-demo-auth-users.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.2",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "pdfkit": "^0.19.1",
+    "qrcode": "^1.5.4"
+  }
+}
