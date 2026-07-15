@@ -362,6 +362,31 @@ const OverviewTab = ({ app, user }) => {
         </div>
       </div>
 
+      {/* ── Decision Details card (read-only, customer portal) ─────────────── */}
+      {isRejected && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '14px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px' }}>
+          <svg style={{ width: '16px', height: '16px', color: '#dc2626', flexShrink: 0, marginTop: '1px' }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Reason</div>
+            <div style={{ fontSize: '13px', color: '#991b1b', lineHeight: 1.5 }}>
+              {app.reviews?.manager?.remarks || 'Credit score does not meet the minimum eligibility criteria.'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(app.status === 'On Hold') && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '14px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px' }}>
+          <svg style={{ width: '16px', height: '16px', color: '#b45309', flexShrink: 0, marginTop: '1px' }} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Reason</div>
+            <div style={{ fontSize: '13px', color: '#92400e', lineHeight: 1.5 }}>
+              {app.reviews?.manager?.remarks || 'Application is under manual review. Waiting for additional verification before a final decision.'}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Requested Documents section ─────────────────────────────── */}
       {isDocRequested && (
         <div style={{ background: 'white', border: '1px solid #fde68a', borderRadius: '12px', overflow: 'hidden' }}>

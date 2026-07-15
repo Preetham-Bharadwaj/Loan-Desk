@@ -1983,6 +1983,9 @@ const ApplicationDetails = () => {
 
     // ── Terminal state: Rejected ─────────────────────────────────────────────
     if (isRejected) {
+      const rejectionReason = app.reviews?.manager?.remarks ||
+        'Credit score does not meet the minimum eligibility criteria.';
+
       return (
         <div style={{ display: 'grid', gap: '14px' }}>
           <div style={{
@@ -2005,6 +2008,17 @@ const ApplicationDetails = () => {
               </div>
             </div>
           </div>
+
+          {/* Decision Details */}
+          <ModuleCard title="Decision Details" icon={XCircle}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: C.redSoft, border: `1px solid ${C.redLine}`, borderRadius: '8px' }}>
+              <XCircle style={{ width: '16px', height: '16px', color: C.red, flexShrink: 0, marginTop: '1px' }} />
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Reason</div>
+                <div style={{ fontSize: '13px', color: '#991b1b', lineHeight: 1.5 }}>{rejectionReason}</div>
+              </div>
+            </div>
+          </ModuleCard>
 
           {(app.generatedDocuments || []).length > 0 && (
             <ModuleCard title="Generated Documents" icon={FileText}>
@@ -2080,20 +2094,32 @@ const ApplicationDetails = () => {
 
             {/* Context banner when application is on hold */}
             {isOnHold && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '10px 14px',
-                background: C.amberSoft,
-                border: `1px solid ${C.amberLine}`,
-                borderRadius: '8px',
-                fontSize: '12px',
-                color: C.amber,
-                fontWeight: 600,
-              }}>
-                <PauseCircle style={{ width: '14px', height: '14px', flexShrink: 0 }} />
-                🟠 ON HOLD — Application placed on hold. Waiting for manual review.
+              <div style={{ display: 'grid', gap: '10px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  background: C.amberSoft,
+                  border: `1px solid ${C.amberLine}`,
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: C.amber,
+                  fontWeight: 600,
+                }}>
+                  <PauseCircle style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+                  🟠 ON HOLD — Application placed on hold. Waiting for manual review.
+                </div>
+                {/* Decision Details — On Hold */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: C.amberSoft, border: `1px solid ${C.amberLine}`, borderRadius: '8px' }}>
+                  <PauseCircle style={{ width: '15px', height: '15px', color: C.amber, flexShrink: 0, marginTop: '1px' }} />
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: C.amber, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Reason</div>
+                    <div style={{ fontSize: '13px', color: C.sub, lineHeight: 1.5 }}>
+                      {app.reviews?.manager?.remarks || 'Application is under manual review. Waiting for additional verification before a final decision.'}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
