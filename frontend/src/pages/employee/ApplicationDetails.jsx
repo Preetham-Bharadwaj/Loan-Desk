@@ -1547,7 +1547,6 @@ const ApplicationDetails = () => {
               <tr style={{ background: '#FAFAFA' }}>
                 <th style={tableHeadCell}>Document</th>
                 <th style={tableHeadCell}>Verification Status</th>
-                <th style={tableHeadCell}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1558,26 +1557,6 @@ const ApplicationDetails = () => {
                   <tr key={doc.key} style={{ borderBottom: `1px solid ${C.line}` }}>
                     <td style={tableCell}>{doc.label}</td>
                     <td style={tableCell}><Badge status={status} /></td>
-                    <td style={tableCell}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          type="button"
-                          title="Preview document"
-                          style={iconButtonStyle}
-                          onClick={() => handleViewDocument(file)}
-                        >
-                          <Eye style={iconStyle} />
-                        </button>
-                        <button
-                          type="button"
-                          title="Download document"
-                          style={iconButtonStyle}
-                          onClick={() => handleDownloadDocument(file, doc.label)}
-                        >
-                          <Download style={iconStyle} />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 );
               })}
