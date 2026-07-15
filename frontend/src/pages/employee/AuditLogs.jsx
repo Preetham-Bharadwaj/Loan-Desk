@@ -71,9 +71,6 @@ const AuditLogs = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', fontFamily: 'Inter, sans-serif' }}>
       <div>
         <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 700, color: C.text }}>Audit Logs</h1>
-        <p style={{ margin: '4px 0 0', fontSize: '13px', color: C.muted }}>
-          Simple chronological activity table for LOS review.
-        </p>
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', padding: '12px', background: C.white, border: `1px solid ${C.border}`, borderRadius: '8px' }}>

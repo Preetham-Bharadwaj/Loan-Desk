@@ -75,7 +75,6 @@ const Queue = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', fontFamily: 'Inter, sans-serif' }}>
       <div>
         <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 700, color: C.text }}>Applications</h1>
-        <p style={{ margin: '4px 0 0', fontSize: '13px', color: C.muted }}>Live queue with search, sorting, filtering, and pagination.</p>
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '12px', background: C.white, border: `1px solid ${C.border}`, borderRadius: '8px' }}>
