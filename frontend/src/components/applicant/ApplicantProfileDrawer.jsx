@@ -410,11 +410,11 @@ const ApplicantProfileDrawer = ({ open, onClose, app }) => {
                     <div style={{ fontSize: '16px', fontWeight: 700, color: C.text, lineHeight: 1.3, marginBottom: '4px' }}>
                       {fullName}
                     </div>
-                    {/* Customer ID */}
+                    {/* Application Number */}
                     <div style={{ fontSize: '11px', color: C.muted, marginBottom: '2px' }}>
-                      Customer ID&nbsp;
+                      Application&nbsp;
                       <span style={{ fontFamily: 'monospace', fontWeight: 600, color: C.sub }}>
-                        {customerId || '—'}
+                        {app?.applicationNumber || app?.id || '—'}
                       </span>
                     </div>
                     {/* Customer Since */}
