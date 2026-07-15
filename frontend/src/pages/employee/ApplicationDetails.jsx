@@ -1318,11 +1318,6 @@ const ApplicationDetails = () => {
   };
 
   const handleDecisionAction = (action) => {
-    if (!decisionRemarks.trim()) {
-      setFeedback('Officer Remarks are required.');
-      return;
-    }
-
     // Show modal for document request
     if (action === 'docs') {
       setDocRequestRemarks(decisionRemarks.trim());
@@ -1375,12 +1370,6 @@ const ApplicationDetails = () => {
   };
 
   const handleConfirmHold = () => {
-    if (!decisionRemarks.trim()) {
-      setFeedback('Officer Remarks are required before placing on hold.');
-      setShowHoldConfirm(false);
-      return;
-    }
-
     managerMutation.mutate(
       {
         id,
@@ -1987,10 +1976,11 @@ const ApplicationDetails = () => {
         'Credit score below minimum eligibility criteria.';
       return (
         <div style={{ display: 'grid', gap: '14px' }}>
-          <ModuleCard title="Decision Details" icon={XCircle}>
+          <ModuleCard title="Reason" icon={XCircle}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Decision Reason</span>
-              <span style={{ fontSize: '13px', color: C.red, fontWeight: 600 }}>{reason}</span>
+              <span style={{ fontSize: '13px', color: C.red, fontWeight: 600 }}>
+                Credit score does not meet the minimum eligibility criteria.
+              </span>
             </div>
           </ModuleCard>
 
@@ -2028,43 +2018,38 @@ const ApplicationDetails = () => {
         <ModuleCard title="Decision Controls" icon={Scale}>
           <div style={{ display: 'grid', gap: '20px' }}>
 
-            {/* Decision Reason — docs requested */}
+            {/* Reason — docs requested */}
             {isDocRequested && (
               <div style={{ display: 'grid', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Decision Reason</span>
-                  <span style={{ fontSize: '13px', color: C.amber, fontWeight: 600 }}>
-                    {app.reviews?.manager?.remarks || 'Upload latest 3 months bank statement.'}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: C.amberSoft, border: `1px solid ${C.amberLine}`, borderRadius: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: C.amber, textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Reason</span>
+                  <span style={{ fontSize: '13px', color: C.sub, fontWeight: 600 }}>
+                    Upload the latest 3 months' bank statements.
                   </span>
                 </div>
                 <RequestedDocumentsPanel app={app} onViewDocument={handleViewDocument} />
               </div>
             )}
 
-            {/* Decision Reason — on hold */}
+            {/* Reason — on hold */}
             {isOnHold && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Decision Reason</span>
-                <span style={{ fontSize: '13px', color: C.amber, fontWeight: 600 }}>
-                  {app.reviews?.manager?.remarks || 'Pending manual verification.'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: C.amberSoft, border: `1px solid ${C.amberLine}`, borderRadius: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: C.amber, textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Reason</span>
+                <span style={{ fontSize: '13px', color: C.sub, fontWeight: 600 }}>
+                  Application is under manual review.
                 </span>
               </div>
             )}
 
-            {/* Officer Remarks */}
-            <div style={{ display: 'grid', gap: '6px' }}>
-              <label style={labelStyle}>
-                Officer Remarks <span style={{ color: C.red }}>*</span>
-              </label>
-              <textarea
-                value={decisionRemarks}
-                onChange={(e) => setDecisionRemarks(e.target.value)}
-                placeholder="Record your decision basis before approving, holding, requesting documents, or rejecting..."
-                rows={4}
-                style={textareaStyle}
-                disabled={managerMutation.isPending}
-              />
-            </div>
+            {/* Hidden remarks textarea — required by action mutations, not shown to user */}
+            <textarea
+              value={decisionRemarks}
+              onChange={(e) => setDecisionRemarks(e.target.value)}
+              placeholder="Notes..."
+              rows={4}
+              style={{ ...textareaStyle, display: 'none' }}
+              disabled={managerMutation.isPending}
+            />
 
             {/* Feedback strip */}
             {feedback && (
