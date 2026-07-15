@@ -2018,19 +2018,6 @@ const ApplicationDetails = () => {
         <ModuleCard title="Decision Controls" icon={Scale}>
           <div style={{ display: 'grid', gap: '20px' }}>
 
-            {/* Reason — docs requested */}
-            {isDocRequested && (
-              <div style={{ display: 'grid', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: C.amberSoft, border: `1px solid ${C.amberLine}`, borderRadius: '8px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: C.amber, textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Reason</span>
-                  <span style={{ fontSize: '13px', color: C.sub, fontWeight: 600 }}>
-                    Upload the latest 3 months' bank statements.
-                  </span>
-                </div>
-                <RequestedDocumentsPanel app={app} onViewDocument={handleViewDocument} />
-              </div>
-            )}
-
             {/* Reason — on hold */}
             {isOnHold && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: C.amberSoft, border: `1px solid ${C.amberLine}`, borderRadius: '8px' }}>
