@@ -1711,7 +1711,6 @@ const ApplicationDetails = () => {
             <MetricCard
               label="CIBIL Score"
               value="XXX"
-              helper="Prototype Credit Score"
             />
             <MetricCard
               label="Monthly Income"
