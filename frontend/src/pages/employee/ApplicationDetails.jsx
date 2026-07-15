@@ -1983,40 +1983,14 @@ const ApplicationDetails = () => {
 
     // ── Terminal state: Rejected ─────────────────────────────────────────────
     if (isRejected) {
-      const rejectionReason = app.reviews?.manager?.remarks ||
-        'Credit score does not meet the minimum eligibility criteria.';
-
+      const reason = app.reviews?.manager?.remarks ||
+        'Credit score below minimum eligibility criteria.';
       return (
         <div style={{ display: 'grid', gap: '14px' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '14px',
-            padding: '20px 24px',
-            background: C.redSoft,
-            border: `1px solid ${C.redLine}`,
-            borderRadius: '10px',
-          }}>
-            <XCircle style={{ width: '20px', height: '20px', color: C.red, flexShrink: 0, marginTop: '1px' }} />
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: 800, color: C.red, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-                Application Closed
-              </div>
-              <div style={{ fontSize: '13px', color: '#991b1b', lineHeight: 1.55 }}>
-                This application has been rejected. The rejection letter has been generated.
-                No further actions are available.
-              </div>
-            </div>
-          </div>
-
-          {/* Decision Details */}
           <ModuleCard title="Decision Details" icon={XCircle}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: C.redSoft, border: `1px solid ${C.redLine}`, borderRadius: '8px' }}>
-              <XCircle style={{ width: '16px', height: '16px', color: C.red, flexShrink: 0, marginTop: '1px' }} />
-              <div>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Reason</div>
-                <div style={{ fontSize: '13px', color: '#991b1b', lineHeight: 1.5 }}>{rejectionReason}</div>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Decision Reason</span>
+              <span style={{ fontSize: '13px', color: C.red, fontWeight: 600 }}>{reason}</span>
             </div>
           </ModuleCard>
 
@@ -2026,32 +2000,16 @@ const ApplicationDetails = () => {
                 {(app.generatedDocuments || []).map((doc) => (
                   <div
                     key={`${doc.documentType}-${doc.fileName}`}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                      padding: '12px 14px',
-                      border: `1px solid ${C.redLine}`,
-                      borderRadius: '10px',
-                      background: C.redSoft,
-                      flexWrap: 'wrap',
-                    }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 14px', border: `1px solid ${C.redLine}`, borderRadius: '10px', background: C.redSoft, flexWrap: 'wrap' }}
                   >
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: '13px', fontWeight: 700, color: C.text }}>{doc.fileName}</div>
                       <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>{doc.documentType}</div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <button type="button" onClick={() => handleViewDocument(doc)} style={iconTextButton}>
-                        <Eye style={iconStyle} /> Preview PDF
-                      </button>
-                      <button type="button" onClick={() => handleDownloadDocument(doc, doc.fileName)} style={iconTextButton}>
-                        <Download style={iconStyle} /> Download
-                      </button>
-                      <button type="button" onClick={() => handlePrintDocument(doc)} style={iconTextButton}>
-                        <Printer style={iconStyle} /> Print
-                      </button>
+                      <button type="button" onClick={() => handleViewDocument(doc)} style={iconTextButton}><Eye style={iconStyle} /> Preview PDF</button>
+                      <button type="button" onClick={() => handleDownloadDocument(doc, doc.fileName)} style={iconTextButton}><Download style={iconStyle} /> Download</button>
+                      <button type="button" onClick={() => handlePrintDocument(doc)} style={iconTextButton}><Printer style={iconStyle} /> Print</button>
                     </div>
                   </div>
                 ))}
@@ -2070,56 +2028,26 @@ const ApplicationDetails = () => {
         <ModuleCard title="Decision Controls" icon={Scale}>
           <div style={{ display: 'grid', gap: '20px' }}>
 
-            {/* Context banner when docs already requested */}
+            {/* Decision Reason — docs requested */}
             {isDocRequested && (
               <div style={{ display: 'grid', gap: '10px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '10px 14px',
-                  background: C.amberSoft,
-                  border: `1px solid ${C.amberLine}`,
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  color: C.amber,
-                  fontWeight: 600,
-                }}>
-                  <FileText style={{ width: '14px', height: '14px', flexShrink: 0 }} />
-                  Additional documents have already been requested from the applicant.
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Decision Reason</span>
+                  <span style={{ fontSize: '13px', color: C.amber, fontWeight: 600 }}>
+                    {app.reviews?.manager?.remarks || 'Upload latest 3 months bank statement.'}
+                  </span>
                 </div>
                 <RequestedDocumentsPanel app={app} onViewDocument={handleViewDocument} />
               </div>
             )}
 
-            {/* Context banner when application is on hold */}
+            {/* Decision Reason — on hold */}
             {isOnHold && (
-              <div style={{ display: 'grid', gap: '10px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '10px 14px',
-                  background: C.amberSoft,
-                  border: `1px solid ${C.amberLine}`,
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  color: C.amber,
-                  fontWeight: 600,
-                }}>
-                  <PauseCircle style={{ width: '14px', height: '14px', flexShrink: 0 }} />
-                  🟠 ON HOLD — Application placed on hold. Waiting for manual review.
-                </div>
-                {/* Decision Details — On Hold */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: C.amberSoft, border: `1px solid ${C.amberLine}`, borderRadius: '8px' }}>
-                  <PauseCircle style={{ width: '15px', height: '15px', color: C.amber, flexShrink: 0, marginTop: '1px' }} />
-                  <div>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: C.amber, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Reason</div>
-                    <div style={{ fontSize: '13px', color: C.sub, lineHeight: 1.5 }}>
-                      {app.reviews?.manager?.remarks || 'Application is under manual review. Waiting for additional verification before a final decision.'}
-                    </div>
-                  </div>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Decision Reason</span>
+                <span style={{ fontSize: '13px', color: C.amber, fontWeight: 600 }}>
+                  {app.reviews?.manager?.remarks || 'Pending manual verification.'}
+                </span>
               </div>
             )}
 
