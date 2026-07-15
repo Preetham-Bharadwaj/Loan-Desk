@@ -485,7 +485,7 @@ const OverviewTab = ({ app, user }) => {
       {/* Details grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
         {[
-          { label: 'Application Number', value: app.id, mono: true },
+          { label: 'Application Number', value: app.applicationNumber || app.id, mono: true },
           { label: 'Loan Product',       value: `${app.loanType} Loan` },
           { label: 'Requested Amount',   value: `₹${app.amount.toLocaleString('en-IN')}` },
           { label: 'Loan Tenure',        value: `${app.tenureMonths} Months` },
@@ -822,7 +822,7 @@ const MyApplications = () => {
                     onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'white'; }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                      <span style={{ fontFamily: 'monospace', fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>{app.id}</span>
+                      <span style={{ fontFamily: 'monospace', fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>{app.applicationNumber || app.id}</span>
                       <Badge status={app.status} />
                     </div>
                     <div style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>{app.loanType} Loan</div>

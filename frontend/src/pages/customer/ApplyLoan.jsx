@@ -278,7 +278,7 @@ const ApplyLoan = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{ color: '#64748b', fontWeight: 600 }}>Application ID</span>
-                <span style={{ fontWeight: 800, fontFamily: 'monospace', fontSize: '14px', color: '#2563eb' }}>{submittedApp.id}</span>
+                <span style={{ fontWeight: 800, fontFamily: 'monospace', fontSize: '14px', color: '#2563eb' }}>{submittedApp.applicationNumber || submittedApp.id}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{ color: '#64748b', fontWeight: 600 }}>Current Status</span>

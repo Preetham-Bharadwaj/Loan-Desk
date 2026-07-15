@@ -604,7 +604,7 @@ const CreditDetailDrawer = ({ section, app, metrics, onClose }) => {
         }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: 'monospace', fontSize: '11px', fontWeight: 700, color: C.muted }}>{app.id}</span>
+              <span style={{ fontFamily: 'monospace', fontSize: '11px', fontWeight: 700, color: C.muted }}>{app.applicationNumber || app.id}</span>
               <Badge status={app.status} />
             </div>
             <h2 style={{ fontSize: '18px', fontWeight: 700, color: C.text, margin: 0 }}>
@@ -1517,7 +1517,7 @@ const ApplicationDetails = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px 16px' }}>
           <Field label="Applicant Name" value={applicant} />
           <Field label="Date of Birth" value={shortDateDob(app?.applicantDetails?.dob)} />
-          <Field label="Application ID" value={app.id} />
+          <Field label="Application ID" value={app.applicationNumber || app.id} />
           <Field label="Loan Type" value={app.loanType || '—'} />
           <Field label="Requested Amount" value={currency(app.amount)} />
           <Field label="Eligible Amount" value={currency(metrics?.eligibleAmount)} />
@@ -2403,7 +2403,7 @@ const ApplicationDetails = () => {
       </div>
 
       <div className="application-summary-grid" style={{ marginBottom: '16px' }}>
-        <SummaryCard label="Application ID" value={app.id} sub="LOS reference" />
+        <SummaryCard label="Application ID" value={app.applicationNumber || app.id} sub="LOS reference" />
         <div style={{
           background: C.white,
           border: `1px solid ${C.border}`,

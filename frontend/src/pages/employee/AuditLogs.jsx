@@ -35,7 +35,7 @@ const AuditLogs = () => {
         activity: event.action || event.status || '—',
         actor: event.actor || event.updatedBy || 'System',
         remarks: event.remarks || '—',
-        searchText: `${app.id} ${event.action || ''} ${event.status || ''} ${event.actor || ''} ${event.remarks || ''}`.toLowerCase(),
+        searchText: `${app.applicationNumber || app.id} ${event.action || ''} ${event.status || ''} ${event.actor || ''} ${event.remarks || ''}`.toLowerCase(),
       }))
     );
 

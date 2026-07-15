@@ -717,6 +717,7 @@ function mapApplicationRow(application, refs) {
   return {
     id: application.application_id,
     applicationId: application.application_id,
+    applicationNumber: application.application_number || application.application_id,
     customerId: application.customer_id,
     loanType: application.loan_type,
     requestedAmount: toNumber(application.requested_amount, 0),

@@ -42,7 +42,7 @@ const Queue = () => {
 
     if (q) {
       list = list.filter((app) =>
-        [app.id, app.applicantDetails?.fullName, app.loanType, app.status, app.reviews?.verification?.officerName, app.reviews?.credit?.officerName, app.reviews?.manager?.managerName]
+        [app.applicationNumber, app.applicantDetails?.fullName, app.loanType, app.status, app.reviews?.verification?.officerName, app.reviews?.credit?.officerName, app.reviews?.manager?.managerName]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(q))
       );
@@ -121,7 +121,7 @@ const Queue = () => {
               ) : (
                 paginatedRows.map((app) => (
                   <tr key={app.id} style={{ borderBottom: `1px solid ${C.line}` }}>
-                    <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '12px', fontWeight: 700, color: C.text }}>{app.id}</td>
+                    <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '12px', fontWeight: 700, color: C.text }}>{app.applicationNumber || app.id}</td>
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{app.applicantDetails?.fullName || '—'}</div>
                     </td>

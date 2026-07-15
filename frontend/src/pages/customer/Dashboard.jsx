@@ -114,7 +114,7 @@ const CustomerDashboard = () => {
                 <tbody>
                   {recentApplications.map((app) => (
                     <tr key={app.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '12px', fontWeight: 700 }}>{app.id}</td>
+                      <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '12px', fontWeight: 700 }}>{app.applicationNumber || app.id}</td>
                       <td style={{ padding: '12px 16px', fontSize: '13px', color: '#334155' }}>{app.loanType}</td>
                       <td style={{ padding: '12px 16px', fontSize: '13px', color: '#334155' }}>INR {Number(app.amount || 0).toLocaleString('en-IN')}</td>
                       <td style={{ padding: '12px 16px' }}><Badge status={app.status} /></td>
