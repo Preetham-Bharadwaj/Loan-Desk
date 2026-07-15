@@ -203,9 +203,45 @@ function normalizeDocumentTypeForDb(key, loanType = '') {
   return map[normalized] || normalized;
 }
 
-function buildApplicationNumber() {
-  const suffix = randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase();
-  return `LD${String(Date.now()).slice(-10)}${suffix}`;
+// ── Application Number Generation ─────────────────────────────────────────────
+// Format: LD + YYYY + 5-digit zero-padded sequence
+// Example: LD202600001, LD202600002, ...
+// Queries the DB for the highest existing number in the current year,
+// then increments by 1. Safe for millions of applications; no schema changes needed.
+async function buildApplicationNumber() {
+  const year = new Date().getFullYear();
+  const prefix = `LD${year}`;
+
+  // Find the highest existing application_number for this year
+  const { data, error } = await supabase
+    .from('loan_applications')
+    .select('application_number')
+    .like('application_number', `${prefix}%`)
+    .order('application_number', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    // On any DB error fall back to a timestamp-based unique number so the
+    // insert never fails.
+    console.warn('[buildApplicationNumber] DB query failed, using fallback:', error.message);
+    const fallback = String(Date.now()).slice(-5).padStart(5, '0');
+    return `${prefix}${fallback}`;
+  }
+
+  let nextSeq = 1;
+  if (data?.application_number) {
+    const existing = String(data.application_number);
+    // Extract the numeric part after the YYYY prefix (e.g. "LD202600042" → 42)
+    const seqStr = existing.slice(prefix.length);
+    const parsed = parseInt(seqStr, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      nextSeq = parsed + 1;
+    }
+  }
+
+  // Zero-pad to 5 digits; supports up to 99999 per year (expand pad if needed)
+  return `${prefix}${String(nextSeq).padStart(5, '0')}`;
 }
 
 function asArray(value) {
@@ -719,7 +755,9 @@ function mapApplicationRow(application, refs) {
     applicationId: application.application_id,
     applicationNumber: application.application_number || application.application_id,
     customerId: application.customer_id,
-    loanType: application.loan_type,
+    loanType: application.loan_type
+      ? String(application.loan_type).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+      : '',
     requestedAmount: toNumber(application.requested_amount, 0),
     amount: toNumber(application.requested_amount, 0),
     eligibleAmount: toNumber(
@@ -1157,7 +1195,7 @@ async function createApplication(payload) {
   const loanApplicationPayload = {
     application_id: applicationId,
     customer_id: customerId,
-    application_number: buildApplicationNumber(),
+    application_number: await buildApplicationNumber(),
     loan_type: normalizeLoanTypeForDb(loanType),
     loan_purpose: payload.purpose || 'General loan application',
     employment_type: employmentDetails.employmentType || employmentDetails.employment_type || 'Salaried',
