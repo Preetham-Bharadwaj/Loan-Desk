@@ -54,9 +54,6 @@ const EmployeeDashboard = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'Inter, sans-serif' }}>
       <div>
         <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 700, color: C.text }}>Dashboard</h1>
-        <p style={{ margin: '4px 0 0', fontSize: '13px', color: C.muted }}>
-          Live operational overview backed by Supabase.
-        </p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '12px' }}>

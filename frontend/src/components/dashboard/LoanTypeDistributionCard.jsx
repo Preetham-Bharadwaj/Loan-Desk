@@ -227,15 +227,6 @@ const LoanTypeDistributionCard = () => {
           </table>
 
           {/* Footer */}
-          <div style={{
-            marginTop: 'auto',
-            paddingTop: '16px',
-            textAlign: 'center',
-            fontSize: '13px',
-            color: C.muted,
-          }}>
-            Based on <span style={{ fontWeight: 600, color: C.blue }}>{totalApplications}</span> Application{totalApplications !== 1 ? 's' : ''}
-          </div>
         </div>
       </div>
     </section>
