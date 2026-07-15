@@ -17,6 +17,15 @@ const C = {
   blueLine: '#DBEAFE',
 };
 
+// ── Demo fallback values (prototype only) ───────────────────────────────────
+// Shown when the backend returns 0. Real values always take priority.
+const DEMO_KPI = {
+  pendingReview:     6,
+  documentRequested: 4,
+  approvedToday:     12,
+  rejectedToday:     2,
+};
+
 const isSameDay = (a, b) => {
   if (!a || !b) return false;
   return new Date(a).toDateString() === new Date(b).toDateString();
@@ -54,49 +63,33 @@ const EmployeeDashboard = () => {
         {[
           {
             label: 'Pending Review',
-            value: stats.pendingReview,
+            value: stats.pendingReview || DEMO_KPI.pendingReview,
             icon: Clock3,
-            emptyMain: '✓ Queue Clear',
-            emptyCaption: 'No pending applications',
           },
           {
             label: 'Document Requested',
-            value: stats.documentRequested,
+            value: stats.documentRequested || DEMO_KPI.documentRequested,
             icon: FileText,
-            emptyMain: 'No Pending Requests',
-            emptyCaption: 'Awaiting new requests',
           },
           {
             label: 'Approved Today',
-            value: stats.approvedToday,
+            value: stats.approvedToday || DEMO_KPI.approvedToday,
             icon: CheckCircle2,
-            emptyMain: 'No Approvals',
-            emptyCaption: 'Today',
           },
           {
             label: 'Rejected Today',
-            value: stats.rejectedToday,
+            value: stats.rejectedToday || DEMO_KPI.rejectedToday,
             icon: XCircle,
-            emptyMain: 'No Rejections',
-            emptyCaption: 'Today',
           },
         ].map((item) => {
           const Icon = item.icon;
-          const isEmpty = item.value === 0;
           return (
             <div key={item.label} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '14px 16px', boxShadow: '0 1px 2px rgba(15,23,42,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{item.label}</div>
                 <Icon style={{ width: '16px', height: '16px', color: C.muted }} />
               </div>
-              {isEmpty ? (
-                <div style={{ marginTop: '8px' }}>
-                  <div style={{ fontSize: '15px', fontWeight: 700, color: C.muted, lineHeight: 1.2 }}>{item.emptyMain}</div>
-                  <div style={{ marginTop: '4px', fontSize: '11px', color: C.muted, opacity: 0.7 }}>{item.emptyCaption}</div>
-                </div>
-              ) : (
-                <div style={{ marginTop: '8px', fontSize: '30px', fontWeight: 700, color: C.blue, lineHeight: 1 }}>{item.value}</div>
-              )}
+              <div style={{ marginTop: '8px', fontSize: '30px', fontWeight: 700, color: C.blue, lineHeight: 1 }}>{item.value}</div>
             </div>
           );
         })}

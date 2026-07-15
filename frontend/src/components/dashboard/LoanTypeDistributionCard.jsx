@@ -23,46 +23,49 @@ const LOAN_TYPES = {
   education: { label: 'Education', color: '#06B6D4' },
 };
 
+// ── Demo fallback dataset (prototype only) ───────────────────────────────────
+// Used when the backend has fewer than 10 applications.
+// Never written to the database — frontend display only.
+const DEMO_DISTRIBUTION = {
+  personal:  48,
+  home:      32,
+  business:  21,
+  vehicle:   16,
+  education: 11,
+};
+const DEMO_TOTAL = Object.values(DEMO_DISTRIBUTION).reduce((a, b) => a + b, 0); // 128
+
 const LoanTypeDistributionCard = () => {
   const { data: apps = [], isLoading } = useApplications();
 
   const { chartData, tableData, totalApplications } = useMemo(() => {
-    // Debug: raw response
-    console.log('[LoanTypeDistribution] raw apps:', apps);
+    const liveTotal = apps.length;
+    const useDemo = liveTotal < 10;
 
-    const total = apps.length;
+    const counts = useDemo ? DEMO_DISTRIBUTION : (() => {
+      const c = {};
+      apps.forEach((app) => {
+        const key = String(app.loanType || app.loan_type || '').trim().toLowerCase();
+        if (LOAN_TYPES[key]) c[key] = (c[key] || 0) + 1;
+      });
+      return c;
+    })();
 
-    // Group by loanType (camelCase from mapApplicationRow) or loan_type fallback
-    const counts = {};
-    apps.forEach((app) => {
-      // Backend mapApplicationRow sets loanType = application.loan_type (raw lowercase string)
-      const raw = app.loanType || app.loan_type || '';
-      const key = String(raw).trim().toLowerCase(); // e.g. "personal"
-      if (LOAN_TYPES[key]) {
-        counts[key] = (counts[key] || 0) + 1;
-      }
-    });
+    const total = useDemo ? DEMO_TOTAL : liveTotal;
 
-    console.log('[LoanTypeDistribution] grouped counts:', counts);
-
-    // Build chart data from the LOAN_TYPES map order, fill = required for Recharts Cell
     const chartData = Object.entries(LOAN_TYPES).map(([key, meta]) => ({
       name: meta.label,
       value: counts[key] || 0,
       fill: meta.color,
     }));
 
-    // Build table data
     const tableData = Object.entries(LOAN_TYPES).map(([key, meta]) => ({
       key,
       label: meta.label,
       color: meta.color,
       count: counts[key] || 0,
-      percentage: total > 0 ? Math.round(((counts[key] || 0) / total) * 100) : 0,
+      percentage: total > 0 ? parseFloat(((counts[key] || 0) / total * 100).toFixed(1)) : 0,
     }));
-
-    console.log('[LoanTypeDistribution] chartData:', chartData);
-    console.log('[LoanTypeDistribution] tableData:', tableData);
 
     return { chartData, tableData, totalApplications: total };
   }, [apps]);
@@ -216,7 +219,7 @@ const LoanTypeDistributionCard = () => {
                     {row.count}
                   </td>
                   <td style={{ textAlign: 'right', padding: '10px 0', fontWeight: 500, color: C.sub }}>
-                    {row.percentage}%
+                    {row.percentage.toFixed(1)}%
                   </td>
                 </tr>
               ))}
