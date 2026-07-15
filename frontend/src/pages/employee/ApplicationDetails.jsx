@@ -1507,7 +1507,7 @@ const ApplicationDetails = () => {
     );
   }
 
-  const submittedAt = sortedTimeline[0]?.timestamp || app?.timeline?.[0]?.timestamp;
+  const submittedAt = app?.submittedAt || sortedTimeline[0]?.timestamp || app?.timeline?.[0]?.timestamp;
   const assignedOfficer = applicantOfficer(app, user);
   const applicant = applicantName(app);
 
